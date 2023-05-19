@@ -8,5 +8,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="eclipse.jdt.core" level="project" />
+    <orderEntry type="library" name="opencsv" level="project" />
   </component>
 </module>

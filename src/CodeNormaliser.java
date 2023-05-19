@@ -1,91 +1,152 @@
+import com.opencsv.CSVWriter;
 import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.dom.AST;
-import org.eclipse.jdt.core.dom.ASTParser;
-import org.eclipse.jdt.core.dom.ASTVisitor;
-import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.*;
+
+import java.io.*;
+import java.util.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class CodeNormaliser extends ASTVisitor {
-//    public boolean visit(VariableDeclarationFragment node) {
-//        System.out.println(node.getName().getIdentifier());
-//        return true;
-//    }
 
-    public static void main(String[] args) {
-        String javaCode = "/* This is a comment */\npublic class MyClass {\n" +
-                "    // This is also a comment\n" +
-                "    public static void main(String[] args) {\n" +
-                "        int x = 10; // This is a comment\n" +
-                "x = x + 1; \n" +
-                "        // This is another comment\n" +
-                "        System.out.println(\"x = \" + x);\n" +
-                "    }\n" +
-                "  public void myMethod() {\n" +
-                "    int x = 0;\n" +
-                "    System.out.println(\"Hello, world!\");\n" +
-                "  }\n" +
-                "}";
+    public static void main(String[] args) throws IOException {
 
-        System.out.println(javaCode);
+        List<String[]> normalisedCodeList = new ArrayList<>();
+        // Java source code CSV file path
+
+        // Loop thoirugh Java files
+        File dir = new File("assets/javaSubmissions");
+        File[] directoryListing = dir.listFiles();
+        if (directoryListing != null) {
+            for (File javaFile : directoryListing) {
+                System.out.println(javaFile.getName());
+                Integer fileName = Integer.parseInt(javaFile.getName().replace(".java",""));
+                char[] javaCodeFile = null;
+                try (BufferedReader reader = new BufferedReader(new FileReader(javaFile))) {
+                    StringBuilder builder = new StringBuilder();
+                    String line = reader.readLine();
+                    while (line != null) {
+                        builder.append(line);
+                        builder.append(System.lineSeparator());
+                        line = reader.readLine();
+                    }
+                    javaCodeFile = builder.toString().toCharArray();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                String normalisedCode = normaliseCode(javaCodeFile);
+//                System.out.println(normalisedCode);
+                normalisedCodeList.add(new String[]{normalisedCode, Integer.toString(fileName)});
+            }
+
+
+        }
+
+        // Write the normalised code list to a CSV file
+//        try (CSVWriter writer = new CSVWriter(new FileWriter("assets/normalisedCodeListNoPrintlnTest.csv"))) {
+//            writer.writeAll(normalisedCodeList);
+//        }
+
+
+
+
+    }
+
+    public static String normaliseCode(char[] javaCode) {
+        String newCode = "";
+
+
         ASTParser parser = ASTParser.newParser(AST.JLS8);
-        parser.setSource(javaCode.toCharArray());
+        parser.setKind(ASTParser.K_COMPILATION_UNIT);
+        parser.setSource(javaCode);
+        // Remove Comments in the code
         parser.setCompilerOptions(new java.util.HashMap<String, String>() {{
             put(JavaCore.COMPILER_DOC_COMMENT_SUPPORT, JavaCore.DISABLED);
         }});
 
-        CompilationUnit unit = (CompilationUnit) parser.createAST(null);
-
-//        Remove Comments in the code
-        String codeWithoutComments = unit.toString().replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("//.*", "");
-//        System.out.println(codeWithoutComments);
-
-        getSourceCodeVariableNames(javaCode);
-    }
-
-    public static void getSourceCodeVariableNames(String javaCode) {
-        String newCode = "";
-        ASTParser parser = ASTParser.newParser(AST.JLS8);
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-        parser.setSource(javaCode.toCharArray());
-
         CompilationUnit cu = (CompilationUnit) parser.createAST(null);
 
-//        Variable related code
+//         Remove package [package_name] line in the code (package declaration)
+        PackageRemover packageRemover = new PackageRemover();
+        cu.accept(packageRemover);
+
+//         Remove library imports
+        ImportRemover importRemover = new ImportRemover();
+        cu.accept(importRemover);
+
+//         Variable related code
         VariableNameVisitor variableVisitor = new VariableNameVisitor();
         cu.accept(variableVisitor);
 
         List<String> variableNames = variableVisitor.getVariableNames();
-        for (String variableName : variableNames) {
-//            System.out.println(variableName);
-        }
         for (int i = 0; i < variableNames.size(); i++) {
             VariableNameChanger variableNameChanger = new VariableNameChanger(variableNames.get(i), "VAR" + i);
             cu.accept(variableNameChanger);
-
             newCode = cu.toString();
-//              System.out.println(newCode);
-
         }
 
 
-//Functions related code
+        // Functions related code
         FunctionNameVisitor functionVisitor = new FunctionNameVisitor();
         cu.accept(functionVisitor);
 
         List<String> functionNames = functionVisitor.getFunctionNames();
-//        System.out.println("Function names: " + functionNames);
 
-        for (int i = 0; i < functionNames.size(); i++) {
-            if (functionNames.get(i) != "main") {
-                FunctionNameChanger functionNameChanger = new FunctionNameChanger(functionNames.get(i), "FUNC" + i);
+        for (int j = 0; j < functionNames.size(); j++) {
+//            if (functionNames.get(j) != "main") {
+                System.out.println(functionNames.get(j));
+
+                FunctionNameChanger functionNameChanger = new FunctionNameChanger(functionNames.get(j), "FUNC" + j);
                 cu.accept(functionNameChanger);
 
                 newCode = cu.toString();
-            }
+//            }
         }
-        System.out.println(newCode);
+
+        // Remove Println lines
+        PrintlnRemover printlnRemover = new PrintlnRemover();
+        cu.accept(printlnRemover);
+        newCode =  cu.toString();
+
+        // Remove new lines
+//        NewlineRemover visitor = new NewlineRemover();
+//        cu.accept(visitor);
+//        newCode = cu.toString();
+        newCode = newCode.replaceAll("\n","");
+
+        //Remove extra whitespaces
+        newCode = newCode.trim().replaceAll(" +", " ");
+
+//        System.out.println(newCode);
+//        return cu.toString();
+                return newCode;
 
     }
+
+
+    public static List<String> loadCsvData(String fileName) {
+        List<String> csvData = new ArrayList<>();
+
+        try {
+            Scanner scanner = new Scanner(new File(fileName));
+
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+//                String values = line.split(",");
+                csvData.add(line);
+            }
+
+            scanner.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        return csvData;
+    }
+
+
+
+
 
 }

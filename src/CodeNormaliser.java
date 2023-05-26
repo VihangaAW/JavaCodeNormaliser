@@ -16,12 +16,12 @@ public class CodeNormaliser extends ASTVisitor {
         // Java source code CSV file path
 
         // Loop thoirugh Java files
-        File dir = new File("assets/javaSubmissions");
+        File dir = new File("assets/EMPLOYEE");
         File[] directoryListing = dir.listFiles();
         if (directoryListing != null) {
             for (File javaFile : directoryListing) {
                 System.out.println(javaFile.getName());
-                Integer fileName = Integer.parseInt(javaFile.getName().replace(".java",""));
+                Integer fileName = Integer.parseInt((javaFile.getName().replace(".java","")).replace("employee_",""));
                 char[] javaCodeFile = null;
                 try (BufferedReader reader = new BufferedReader(new FileReader(javaFile))) {
                     StringBuilder builder = new StringBuilder();
@@ -37,6 +37,7 @@ public class CodeNormaliser extends ASTVisitor {
                 }
                 String normalisedCode = normaliseCode(javaCodeFile);
 //                System.out.println(normalisedCode);
+//                normalisedCodeList.add(new String[]{String.valueOf(javaCodeFile), Integer.toString(fileName)});
                 normalisedCodeList.add(new String[]{normalisedCode, Integer.toString(fileName)});
             }
 
@@ -44,7 +45,7 @@ public class CodeNormaliser extends ASTVisitor {
         }
 
         // Write the normalised code list to a CSV file
-//        try (CSVWriter writer = new CSVWriter(new FileWriter("assets/normalisedCodeListNoPrintlnTest.csv"))) {
+//        try (CSVWriter writer = new CSVWriter(new FileWriter("assets/normalisedCodeEmployee.csv"))) {
 //            writer.writeAll(normalisedCodeList);
 //        }
 
@@ -108,6 +109,16 @@ public class CodeNormaliser extends ASTVisitor {
         PrintlnRemover printlnRemover = new PrintlnRemover();
         cu.accept(printlnRemover);
         newCode =  cu.toString();
+
+//        Print string return mrthods
+//        MethodVisitor visitor = new MethodVisitor();
+//        cu.accept(visitor);
+
+//        String[] stringMethods = visitor.getStringMethods();
+//        for (String method : stringMethods) {
+//            System.out.println(method);
+//        }
+
 
         // Remove new lines
 //        NewlineRemover visitor = new NewlineRemover();
